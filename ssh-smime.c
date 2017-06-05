@@ -8,6 +8,14 @@
  * This utility is licensed under the same terms as OpenSSL itself.
  */
 
+ /***************************************************************
+ * Post Fork Changes
+ * -Generalize RSA SSH Public Key Extraction for Robustness
+
+ ***************************************************************/
+
+
+
 #include <stdio.h>
 #include <err.h>
 #include <string.h>
@@ -31,7 +39,25 @@ extern int optind;
 
 BIO *in_bio, *out_bio;
 
-void die_usage() {
+
+/*********************************************************
+** PROTOTYPES ********************************************
+*********************************************************/
+void die_usage(void);
+char **parse_opts(int, char **);
+X509 *gen_temp_cert(RSA *);
+int base64_decode(char *, char *);
+void *read_bytes(char *, int, int, int *, void *);
+RSA *parse_ssh_pubkey(char *, char *, int);
+RSA *read_ssh_pubkey(char *);
+STACK_OF(X509) *create_cert_stack(char **);
+int extractRsaCrypto(char *, char *, int);
+X509 *extractTransformRsaPublicKey(char *);
+
+
+
+
+void die_usage(void) {
     fprintf(stderr, "usage: ssh-smime [-h] [-i file] [-o file] ssh-pubkey1 [ssh-pubkey2] [...]\n\n");
 #if USE_OPENSSL_CMS
     fprintf(stderr, "CMS encrypt input using ssh keys for recipients.\n\n");
@@ -195,10 +221,12 @@ RSA *read_ssh_pubkey(char *file)
 {
     // Limit taken from SSH keygen
     char line[SSH_MAX_PUBKEY_BYTES + 1];
-    char *key;
-    char *comment;
+    //char *key;
+    //char *comment;
     char decoded_key[SSH_MAX_PUBKEY_BYTES * 2];
     int decoded_size;
+    char out_key[SSH_MAX_PUBKEY_BYTES * 2];
+    int ret = 0;
 
     FILE *f = fopen(file, "r");
     if (!f) err(1, "Failed to open file %s: ", file);
@@ -212,6 +240,7 @@ RSA *read_ssh_pubkey(char *file)
      * followed by the base64-encoded key material, followed by a comment. We
      * only care about the base64-encoded part.
      */
+    /*
     key = strchr(line, ' ');
     if (!key) errx(1, "Public key file appears invalid");
     //line[key] = '\0'; // Line now contains just the key name.
@@ -219,8 +248,11 @@ RSA *read_ssh_pubkey(char *file)
     if ((comment = strchr(key, ' '))) {
         *comment = '\0'; // We don't want the comment. Pretend we never read it.
     }
+    */
 
-    decoded_size = base64_decode(key, decoded_key);
+    ret =  extractRsaCrypto(line, out_key, (SSH_MAX_PUBKEY_BYTES * 2));
+    //decoded_size = base64_decode(key, decoded_key);
+    decoded_size = base64_decode(out_key, decoded_key);
     return parse_ssh_pubkey(file, decoded_key, decoded_size);
 }
 
@@ -234,6 +266,7 @@ STACK_OF(X509) *create_cert_stack(char **recipients)
 
     while(recipients[i]) {
         cert = gen_temp_cert(read_ssh_pubkey(recipients[i++]));
+        //cert = extractTransformRsaPublicKey(recipients[i++]);
         if (!sk_X509_push(cert_stack, cert)) {
             err(1, "Failed to add certificate to stack");
         }
@@ -304,3 +337,65 @@ int main(int argc, char **argv)
     return ret;
 }
 
+
+
+/******************************************************************************
+ * IN: IN is an RSA SSH Public Key
+ *     OUT is Crypto Portion of Public Key
+ *     outSize is int size of OUT
+ * OUT: int return code
+ * Fn: int extractRsaCrypto(char *IN, char *OUT, int outSize)
+ * More robustly handle parsing for all types of RSA SSH Public Keys
+*******************************************************************************/
+int extractRsaCrypto(char *IN, char *OUT, int outSize)
+{
+  char INcopy[SSH_MAX_PUBKEY_BYTES * 2];
+  char *token;
+
+  sprintf(INcopy, "%s", IN);
+  token = strtok(INcopy, " ");
+  while (token != NULL )
+  {
+    if (strcmp(token, "ssh-rsa")==0)
+    {
+      if (token != NULL) {
+        token = strtok(NULL, " ");
+        sprintf(OUT, "%s", token);
+        return 0;
+      }
+      else return -1;
+    }
+    token = strtok(NULL, " ");
+  }
+
+  return -1;
+}
+
+/******************************************************************************
+ * IN: rsaSshPubKeyString is an RSA SSH Public Key
+ * OUT: X509 Certificate
+ * Fn: X509 extractTransformRsaPublicKey(char *rsaSshPubKeyString)
+ * Based on John Eaglesham's ssh-smime ETL function (BSD-style License)
+*******************************************************************************/
+X509 *extractTransformRsaPublicKey(char *rsaSshPubKeyString)
+{
+  X509 *cert = X509_new();
+  char decoded_key[SSH_MAX_PUBKEY_BYTES * 2];
+  char binary_rsa_key[SSH_MAX_PUBKEY_BYTES * 2];
+  int ret;
+  int decoded_size;
+  RSA *key = RSA_new();
+ 
+  // Extract and Decode Crypto String
+  ret = extractRsaCrypto(rsaSshPubKeyString, decoded_key, (SSH_MAX_PUBKEY_BYTES * 2));
+  if (ret != 0) errx(1, "Failed to Extract/Transform RSA Key.");
+
+  decoded_size = base64_decode(decoded_key, binary_rsa_key);
+  key = parse_ssh_pubkey("Configured RSA SSH Public Key", binary_rsa_key, decoded_size);
+  cert = gen_temp_cert(key);
+
+  return cert;
+}
+
+
+// EOF
