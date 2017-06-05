@@ -7,6 +7,15 @@ Used to securely share files with someone when all you have is their SSH public
 key.
 
 
+Fork Synopsis
+=============
+
+The main purpose of this fork is to enhance (make more robust) the SSH Public Key
+parsing and remove the assumptions currently employed. This mainly focuses on 
+parsing everything that can be legally defined before the 'ssh-rsa' string such
+as COMMAND or FROM prepends up to a total key size of 16k bytes.
+
+
 Synopsis
 =======
 
