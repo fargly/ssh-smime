@@ -17,11 +17,13 @@
 
 
 #include <stdio.h>
-#include <err.h>
 #include <string.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <openssl/pem.h>
+//#if ! defined(sun)
+//#include <err.h>
+//#endif
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
@@ -85,11 +87,13 @@ char **parse_opts(int argc, char **argv)
         switch (ch) {
             case 'i':
                 in_bio = BIO_new_file(optarg, "r");
-                if (!in_bio) err(1, "Unable to open file %s for reading: ", optarg);
+                if (!in_bio) //err(1, "Unable to open file %s for reading: ", optarg);
+                  fprintf(stderr, "Unable to open file %s for reading: ", optarg);
                 break;
             case 'o':
                 out_bio = BIO_new_file(optarg, "w");
-                if (!out_bio) err(1, "Unable to open file %s for writing: ", optarg);
+                if (!out_bio) //err(1, "Unable to open file %s for writing: ", optarg);
+                  fprintf(stderr, "Unable to open file %s for writing: ", optarg);
                 break;
             case 'h':
             case '?':
@@ -117,11 +121,14 @@ X509 *gen_temp_cert(RSA *key)
     EVP_PKEY *pk;
     X509_NAME *name = NULL;
 
-    if ((pk = EVP_PKEY_new()) == NULL) errx(1, "Failed to allocate pubkey");
+    if ((pk = EVP_PKEY_new()) == NULL) //errx(1, "Failed to allocate pubkey");
+      fprintf(stderr, "Failed to allocate pubkey");
 
-    if ((cert = X509_new()) == NULL) errx(1, "Failed to allocate cert");
+    if ((cert = X509_new()) == NULL) //errx(1, "Failed to allocate cert");
+      fprintf(stderr, "Failed to allocate cert");
 
-    if (!EVP_PKEY_assign_RSA(pk, key)) errx(1, "Failed to assign key");
+    if (!EVP_PKEY_assign_RSA(pk, key)) //errx(1, "Failed to assign key");
+      fprintf(stderr, "Failed to assign key");
 
     X509_set_version(cert, 3);
     ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
@@ -167,7 +174,8 @@ int base64_decode(char *key, char *inbuf)
 void *read_bytes(char *blob, int blobsize, int amount, int *offset, void *dest)
 {
     void *r;
-    if (*offset + amount > blobsize) errx(1, "Attempt to read past buffer");
+    if (*offset + amount > blobsize) //errx(1, "Attempt to read past buffer");
+      fprintf(stderr, "Attempt to read past buffer");
     memcpy(dest, blob + *offset, amount);
     r = blob + *offset;
     *offset += amount;
@@ -181,7 +189,8 @@ RSA *parse_ssh_pubkey(char *file, char *key, int keysize)
     int offset = 0;
     RSA *rsa = RSA_new();
 
-    if (!rsa) errx(1, "Could not allocate RSA");
+    if (!rsa) //errx(1, "Could not allocate RSA");
+      fprintf(stderr, "Could not allocate RSA");
 
     /*
      * The documentation states e and n will be allocated on a call to
@@ -189,9 +198,11 @@ RSA *parse_ssh_pubkey(char *file, char *key, int keysize)
      * them now.
      */
     rsa->e = BN_new();
-    if (!rsa->e) errx(1, "Could not allocate BIGNUM");
+    if (!rsa->e) //errx(1, "Could not allocate BIGNUM");
+      fprintf(stderr, "Could not allocate BIGNUM");
     rsa->n = BN_new();
-    if (!rsa->n) errx(1, "Could not allocate BUGNUM");
+    if (!rsa->n) //errx(1, "Could not allocate BUGNUM");
+      fprintf(stderr, "Could not allocate BIGNUM");
 
     // Read 4 bytes, the length of the key type name.
     read_bytes(key, keysize, 4, &offset, &i);
@@ -200,19 +211,22 @@ RSA *parse_ssh_pubkey(char *file, char *key, int keysize)
     read_bytes(key, keysize, i, &offset, &buf);
     buf[i] = '\0';
 
-    if (strcmp(buf, "ssh-rsa")) errx(1, "%s does not appear to contain an SSH RSA public key", file);
+    if (strcmp(buf, "ssh-rsa")) //errx(1, "%s does not appear to contain an SSH RSA public key", file);
+      fprintf(stderr, "%s does not appear to contain an SSH RSA public key", file);
 
     // Same as above, for e.
     read_bytes(key, keysize, 4, &offset, &i);
     i = ntohl(i);
     read_bytes(key, keysize, i, &offset, &buf);
-    if (BN_bin2bn((unsigned char *)buf, i, rsa->e) == NULL) errx(1, "buffer_get_bignum2_ret: BN_bin2bn failed");
+    if (BN_bin2bn((unsigned char *)buf, i, rsa->e) == NULL) //errx(1, "buffer_get_bignum2_ret: BN_bin2bn failed");
+      fprintf(stderr, "buffer_get_bignum2_ret: BN_bin2bn failed");
 
     // Same as above, for n.
     read_bytes(key, keysize, 4, &offset, &i);
     i = ntohl(i);
     read_bytes(key, keysize, i, &offset, &buf);
-    if (BN_bin2bn((unsigned char *)buf, i, rsa->n) == NULL) errx(1, "buffer_get_bignum2_ret: BN_bin2bn failed");
+    if (BN_bin2bn((unsigned char *)buf, i, rsa->n) == NULL) //errx(1, "buffer_get_bignum2_ret: BN_bin2bn failed");
+      fprintf(stderr, "buffer_get_bignum2_ret: BN_bin2bn failed");
 
     return rsa;
 }
@@ -229,26 +243,13 @@ RSA *read_ssh_pubkey(char *file)
     int ret = 0;
 
     FILE *f = fopen(file, "r");
-    if (!f) err(1, "Failed to open file %s: ", file);
+    if (!f) //err(1, "Failed to open file %s: ", file);
+      fprintf(stderr, "Failed to open file %s: ", file);
     fread(line, SSH_MAX_PUBKEY_BYTES, 1, f);
-    if (ferror(f)) err(1, "Failed to read public key file %s: ", file);
+    if (ferror(f)) //err(1, "Failed to read public key file %s: ", file);
+      fprintf(stderr, "Failed to read public key file %s: ", file);
     fclose(f);
     line[SSH_MAX_PUBKEY_BYTES] = '\0';
-
-    /*
-     * SSH public key files start with a string key type, followed by a space,
-     * followed by the base64-encoded key material, followed by a comment. We
-     * only care about the base64-encoded part.
-     */
-    /*
-    key = strchr(line, ' ');
-    if (!key) errx(1, "Public key file appears invalid");
-    //line[key] = '\0'; // Line now contains just the key name.
-    key++;
-    if ((comment = strchr(key, ' '))) {
-        *comment = '\0'; // We don't want the comment. Pretend we never read it.
-    }
-    */
 
     ret =  extractRsaCrypto(line, out_key, (SSH_MAX_PUBKEY_BYTES * 2));
     //decoded_size = base64_decode(key, decoded_key);
@@ -262,13 +263,15 @@ STACK_OF(X509) *create_cert_stack(char **recipients)
     STACK_OF(X509) *cert_stack = sk_X509_new_null();
     int i = 0;
 
-    if (!cert_stack) err(1, "Failed to allocate certificate stack.");
+    if (!cert_stack) //err(1, "Failed to allocate certificate stack.");
+      fprintf(stderr, "Failed to allocate certificate stack.");
 
     while(recipients[i]) {
         cert = gen_temp_cert(read_ssh_pubkey(recipients[i++]));
         //cert = extractTransformRsaPublicKey(recipients[i++]);
         if (!sk_X509_push(cert_stack, cert)) {
-            err(1, "Failed to add certificate to stack");
+            //err(1, "Failed to add certificate to stack");
+            fprintf(stderr, "Failed to add certificate to stack");
         }
     }
     return cert_stack;
@@ -388,7 +391,8 @@ X509 *extractTransformRsaPublicKey(char *rsaSshPubKeyString)
  
   // Extract and Decode Crypto String
   ret = extractRsaCrypto(rsaSshPubKeyString, decoded_key, (SSH_MAX_PUBKEY_BYTES * 2));
-  if (ret != 0) errx(1, "Failed to Extract/Transform RSA Key.");
+  if (ret != 0) //errx(1, "Failed to Extract/Transform RSA Key.");
+      fprintf(stderr, "Failed to Extract/Transform RSA Key.");
 
   decoded_size = base64_decode(decoded_key, binary_rsa_key);
   key = parse_ssh_pubkey("Configured RSA SSH Public Key", binary_rsa_key, decoded_size);

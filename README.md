@@ -15,6 +15,9 @@ parsing and remove the assumptions currently employed. This mainly focuses on
 parsing everything that can be legally defined before the 'ssh-rsa' string such
 as COMMAND or FROM prepends up to a total key size of 16k bytes.
 
+Alter program to be portable across additional Unix platforms:
+Linux 64bit, Linux 32bit, SunOS x86, SunOS SPARC, and AIX
+
 
 Synopsis
 =======
