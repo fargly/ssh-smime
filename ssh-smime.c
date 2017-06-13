@@ -11,6 +11,7 @@
  /***************************************************************
  * Post Fork Changes
  * -Generalize RSA SSH Public Key Extraction for Robustness
+ * -Refactor for endian issue
 
  ***************************************************************/
 
@@ -21,7 +22,6 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <openssl/pem.h>
-//#include <err.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
@@ -186,7 +186,8 @@ void *read_bytes(char *blob, int blobsize, int amount, int *offset, void *dest)
 
 RSA *parse_ssh_pubkey(char *file, char *key, int keysize)
 {
-    unsigned long i;
+    //unsigned long i;
+    uint32_t i;
     char buf[SSH_MAX_PUBKEY_BYTES];
     int offset = 0;
     RSA *rsa = RSA_new();
